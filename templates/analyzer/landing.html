@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}ModelYourData - Upload CSV{% endblock %}
+
+{% block content %}
+<div class="landing-container">
+    <div class="landing-content">
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <h1 class="hero-title">ModelYourData</h1>
+            <p class="hero-subtitle">Upload your CSV file to visualize and analyze your data instantly</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <form id="uploadForm" method="post" action="{% url 'upload' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    
+                    <h3 class="upload-title">Drag & Drop Your CSV File</h3>
+                    <p class="upload-text">or</p>
+                    
+                    <label for="csvFile" class="browse-button">
+                        Browse Files
+                    </label>
+                    
+                    {{ form.file }}
+                    
+                    <p class="upload-info">Maximum file size: 10MB</p>
+                </div>
+                
+                <div id="fileInfo" class="file-info" style="display: none;">
+                    <p class="selected-file">
+                        <strong>Selected:</strong> <span id="fileName"></span>
+                    </p>
+                    <button type="submit" class="submit-button">
+                        Upload & Analyze
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Features Section -->
+        <div class="features-section">
+            <h2 class="features-title">What You Can Do</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Data Visualization</h3>
+                    <p>View your data in interactive tables and charts</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3>Linear Regression</h3>
+                    <p>Analyze relationships between variables</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Clustering</h3>
+                    <p>Discover patterns with K-Means clustering</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📉</div>
+                    <h3>Distribution Plots</h3>
+                    <p>Understand data distribution patterns</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📋</div>
+                    <h3>Statistical Summary</h3>
+                    <p>Get comprehensive statistical insights</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Full EDA Report</h3>
+                    <p>Complete exploratory data analysis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // File input handling
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('csvFile');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const uploadForm = document.getElementById('uploadForm');
+
+    // Handle file selection
+    fileInput.addEventListener('change', function(e) {
+        if (this.files && this.files[0]) {
+            displayFileInfo(this.files[0]);
+        }
+    });
+
+    // Drag and drop handlers
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('drag-over');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            displayFileInfo(files[0]);
+        }
+    });
+
+    function displayFileInfo(file) {
+        // Check if file is CSV
+        if (!file.name.endsWith('.csv')) {
+            alert('Please upload a CSV file');
+            return;
+        }
+        
+        // Check file size (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            alert('File size must not exceed 10MB');
+            return;
+        }
+        
+        fileName.textContent = file.name;
+        fileInfo.style.display = 'block';
+    }
+
+    // Auto-submit on file selection (optional)
+    // Uncomment the following lines to auto-submit
+    /*
+    fileInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            setTimeout(() => {
+                uploadForm.submit();
+            }, 500);
+        }
+    });
+    */
+</script>
+{% endblock %}

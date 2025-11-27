@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Analysis - {{ file.original_filename }}{% endblock %}
+
+{% block content %}
+<div class="analysis-container">
+    <!-- File Info Bar -->
+    <div class="file-info-bar">
+        <div class="container">
+            <div class="file-details">
+                <h2>📊 {{ file.original_filename }}</h2>
+                <div class="file-stats">
+                    <span class="stat-item">
+                        <strong>Rows:</strong> {{ n_rows }}
+                    </span>
+                    <span class="stat-item">
+                        <strong>Columns:</strong> {{ n_columns }}
+                    </span>
+                    <span class="stat-item">
+                        <strong>Numeric:</strong> {{ n_numeric }}
+                    </span>
+                </div>
+            </div>
+            <div class="file-actions">
+                <a href="{% url 'download_csv' file.id %}" class="action-btn secondary">
+                    Download CSV
+                </a>
+                <a href="{% url 'landing' %}" class="action-btn secondary">
+                    Upload New
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Analysis Area -->
+    <div class="container analysis-content">
+        <!-- Visualization Display -->
+        <div class="visualization-box" id="visualizationBox">
+            <div class="viz-header">
+                <h3 id="vizTitle">Data Preview</h3>
+                <button id="downloadBtn" class="export-btn" style="display: none;">
+                    Export Visualization
+                </button>
+            </div>
+            
+            <div class="viz-content" id="vizContent">
+                <!-- Initial table preview -->
+                <div class="table-container">
+                    {{ table_html|safe }}
+                </div>
+            </div>
+            
+            <div class="viz-stats" id="vizStats" style="display: none;">
+                <!-- Statistics will be displayed here -->
+            </div>
+            
+            <!-- Loading indicator -->
+            <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+                <div class="spinner"></div>
+                <p>Processing...</p>
+            </div>
+        </div>
+
+        <!-- Operation Panel -->
+        <div class="operation-panel">
+            <h3 class="panel-title">Analytical Operations</h3>
+            
+            <div class="operations-grid">
+                <button class="operation-btn" data-operation="preview">
+                    <span class="op-icon">📋</span>
+                    <span class="op-name">Data Preview</span>
+                </button>
+                
+                <button class="operation-btn" data-operation="regression">
+                    <span class="op-icon">📈</span>
+                    <span class="op-name">Linear Regression</span>
+                </button>
+                
+                <button class="operation-btn" data-operation="clustering">
+                    <span class="op-icon">🎯</span>
+                    <span class="op-name">Clustering</span>
+                </button>
+                
+                <button class="operation-btn" data-operation="distribution">
+                    <span class="op-icon">📊</span>
+                    <span class="op-name">Distribution Plot</span>
+                </button>
+                
+                <button class="operation-btn" data-operation="summary">
+                    <span class="op-icon">📋</span>
+                    <span class="op-name">Statistical Summary</span>
+                </button>
+                
+                <button class="operation-btn" data-operation="eda">
+                    <span class="op-icon">🔍</span>
+                    <span class="op-name">Full EDA Report</span>
+                </button>
+            </div>
+            
+            <!-- Additional Options (for operations that need parameters) -->
+            <div class="operation-options" id="operationOptions" style="display: none;">
+                <div class="option-group" id="clusteringOptions" style="display: none;">
+                    <label for="nClusters">Number of Clusters:</label>
+                    <input type="number" id="nClusters" min="2" max="10" value="3">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const fileId = {{ file.id }};
+    const operationUrl = "{% url 'perform_operation' file.id %}";
+    const downloadUrl = "{% url 'download_viz' file.id %}";
+    const csrfToken = "{{ csrf_token }}";
+    
+    const vizContent = document.getElementById('vizContent');
+    const vizTitle = document.getElementById('vizTitle');
+    const vizStats = document.getElementById('vizStats');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const operationBtns = document.querySelectorAll('.operation-btn');
+    
+    let currentOperation = null;
+    
+    // Operation button click handlers
+    operationBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const operation = this.getAttribute('data-operation');
+            performOperation(operation);
+            
+            // Update active state
+            operationBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+    
+    // Download button handler
+    downloadBtn.addEventListener('click', function() {
+        window.location.href = downloadUrl;
+    });
+    
+    // Perform operation via AJAX
+    function performOperation(operation) {
+        currentOperation = operation;
+        
+        // Show loading indicator
+        loadingIndicator.style.display = 'flex';
+        vizContent.style.opacity = '0.3';
+        
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('operation', operation);
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        
+        // Add additional parameters for specific operations
+        if (operation === 'clustering') {
+            const nClusters = document.getElementById('nClusters')?.value || 3;
+            formData.append('n_clusters', nClusters);
+        }
+        
+        // Send AJAX request
+        fetch(operationUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Hide loading indicator
+            loadingIndicator.style.display = 'none';
+            vizContent.style.opacity = '1';
+            
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            
+            // Update title
+            const titles = {
+                'preview': 'Data Preview',
+                'regression': 'Linear Regression Analysis',
+                'clustering': 'K-Means Clustering',
+                'distribution': 'Distribution Analysis',
+                'summary': 'Statistical Summary',
+                'eda': 'Exploratory Data Analysis Report'
+            };
+            vizTitle.textContent = titles[operation] || 'Analysis Result';
+            
+            // Update content
+            if (data.image) {
+                // Display image
+                vizContent.innerHTML = `<img src="data:image/png;base64,${data.image}" alt="${operation}" class="viz-image">`;
+                downloadBtn.style.display = 'inline-block';
+            } else if (data.html) {
+                // Display HTML content
+                vizContent.innerHTML = `<div class="table-container">${data.html}</div>`;
+                downloadBtn.style.display = 'none';
+            }
+            
+            // Display statistics
+            if (data.stats && Object.keys(data.stats).length > 0) {
+                displayStats(data.stats);
+            } else {
+                vizStats.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            loadingIndicator.style.display = 'none';
+            vizContent.style.opacity = '1';
+            showError('An error occurred while processing your request.');
+            console.error('Error:', error);
+        });
+    }
+    
+    // Display statistics
+    function displayStats(stats) {
+        let statsHtml = '<div class="stats-grid">';
+        
+        for (const [key, value] of Object.entries(stats)) {
+            if (key === 'error') continue;
+            
+            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            let displayValue = value;
+            
+            // Format value if it's a number
+            if (typeof value === 'number') {
+                displayValue = value.toFixed(4);
+            } else if (Array.isArray(value)) {
+                displayValue = value.join(', ');
+            }
+            
+            statsHtml += `
+                <div class="stat-card">
+                    <div class="stat-label">${label}</div>
+                    <div class="stat-value">${displayValue}</div>
+                </div>
+            `;
+        }
+        
+        statsHtml += '</div>';
+        vizStats.innerHTML = statsHtml;
+        vizStats.style.display = 'block';
+    }
+    
+    // Show error message
+    function showError(message) {
+        vizContent.innerHTML = `
+            <div class="error-message">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <h3>Error</h3>
+                <p>${message}</p>
+            </div>
+        `;
+        vizStats.style.display = 'none';
+        downloadBtn.style.display = 'none';
+    }
+</script>
+{% endblock %}
