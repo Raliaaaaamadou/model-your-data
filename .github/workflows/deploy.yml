@@ -1,9 +1,9 @@
 name: CI-CD - Build & Deploy
 
-# déclenche sur push vers main (change si vous utilisez autre branche)
+# déclenche sur push vers la branche tests
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "tests" ]
 
 jobs:
   build-and-push:
@@ -24,13 +24,13 @@ jobs:
 
       - name: Build image (latest + commit sha)
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest .
-          docker tag ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:${{ github.sha }}
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/modelyourdata-web:latest .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/modelyourdata-web:latest ${{ secrets.DOCKER_USERNAME }}/modelyourdata-web:${{ github.sha }}
 
       - name: Push images to Docker Hub
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/modelyourdata-web:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/modelyourdata-web:${{ github.sha }}
 
   deploy:
     name: Deploy to VM via SSH
@@ -40,14 +40,13 @@ jobs:
       - name: Deploy - Pull & Run on VM
         uses: appleboy/ssh-action@v0.1.8
         with:
-          host: 51.103.172.73
-          username: adminuser
-          # Place ici ta clé privée dans les Secrets GitHub (ex: id_rsa_azure)
-          key: ${{ secrets.ID_RSA_AZURE }}
+          host: ${{ secrets.VM_HOST }}          # IP de la VM à ajouter dans Secrets
+          username: ${{ secrets.VM_USER }}      # utilisateur SSH à ajouter dans Secrets
+          key: ${{ secrets.VM_SSH_KEY }}        # clé privée SSH à ajouter dans Secrets
           script: |
             # Variables
-            IMAGE=${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest
-            CONTAINER_NAME=mon-app-cloud
+            IMAGE=${{ secrets.DOCKER_USERNAME }}/modelyourdata-web:latest
+            CONTAINER_NAME=modelyourdata-web
 
             # Pull the new image
             docker pull $IMAGE
@@ -56,7 +55,7 @@ jobs:
             docker stop $CONTAINER_NAME || true
             docker rm $CONTAINER_NAME || true
 
-            # Remove old image optional (frees space)
+            # Remove old images optionally (frees space)
             docker image prune -f || true
 
             # Run the new container (adjust ports if needed)
