@@ -40,9 +40,10 @@ jobs:
       - name: Deploy - Pull & Run on VM
         uses: appleboy/ssh-action@v0.1.8
         with:
-          host: ${{ secrets.VM_HOST }}          # IP à ajouter quand la VM est prête
-          username: ${{ secrets.VM_USER }}      # user (ex: ubuntu)
-          key: ${{ secrets.VM_SSH_KEY }}        # clé privée (mettre dans Secrets)
+          host: 51.103.172.73
+          username: adminuser
+          # Place ici ta clé privée dans les Secrets GitHub (ex: id_rsa_azure)
+          key: ${{ secrets.ID_RSA_AZURE }}
           script: |
             # Variables
             IMAGE=${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest
