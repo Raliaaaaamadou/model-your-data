@@ -1,0 +1,75 @@
+name: CI-CD - Build & Deploy
+
+# déclenche sur push vers main (change si vous utilisez autre branche)
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build image (latest + commit sha)
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:${{ github.sha }}
+
+      - name: Push images to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:${{ github.sha }}
+
+  deploy:
+    name: Deploy to VM via SSH
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Deploy - Pull & Run on VM
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.VM_HOST }}          # IP à ajouter quand la VM est prête
+          username: ${{ secrets.VM_USER }}      # user (ex: ubuntu)
+          key: ${{ secrets.VM_SSH_KEY }}        # clé privée (mettre dans Secrets)
+          script: |
+            # Variables
+            IMAGE=${{ secrets.DOCKER_USERNAME }}/mon-app-cloud:latest
+            CONTAINER_NAME=mon-app-cloud
+
+            # Pull the new image
+            docker pull $IMAGE
+
+            # Stop and remove existing container (ignore errors)
+            docker stop $CONTAINER_NAME || true
+            docker rm $CONTAINER_NAME || true
+
+            # Remove old image optional (frees space)
+            docker image prune -f || true
+
+            # Run the new container (adjust ports if needed)
+            docker run -d \
+              --name $CONTAINER_NAME \
+              --restart unless-stopped \
+              -p 80:3000 \
+              $IMAGE
+
+            # Health check (fail if not OK)
+            sleep 3
+            if ! curl -fsS http://localhost:3000/health ; then
+              echo "Healthcheck failed"
+              exit 1
+            fi
+
+            echo "Déploiement terminé"
